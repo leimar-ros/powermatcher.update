@@ -1,0 +1,59 @@
+apply from: rootProject.file("${bnd_cnf}/gradle/master.gradle")
+
+// Reconfigure the Javadoc classes
+generateJavadoc.source = fileTree('.') {
+                             include 'net.powermatcher.api/**/*.java'
+                             include 'net.powermatcher.core/**/*.java'
+                             include 'net.powermatcher.peakshaving/**/*.java'
+                             exclude '*.test/*'
+                             exclude '**/*Test.java'
+                         }
+generateJavadoc.enabled = true
+
+
+// Generate sonar-runner.properties containing all projects and jars
+task generatesonar << {
+
+    // Find all OSGI projects and only include BND projects with actual source code
+    def f = new File('.')
+    def bndProjects = []
+    f.eachFile { 
+        if(new File(it, 'bnd.bnd').exists() && new File(it, 'src').exists()) {
+            bndProjects << it.name
+        } 
+    }
+
+    // Write sonar runner properties file
+    def settingsFile = new File('sonar-runner.properties')
+    settingsFile.text = ''
+    settingsFile << 'sonar.sources=src\n'
+    settingsFile << 'sonar.binaries=bin\n'
+    settingsFile << 'sonar.junit.reportsPath=generated/test-results\n'
+    settingsFile << 'sonar.jacoco.reportPath=generated/jacoco/test.exec\n'
+    
+    // Add all projects comma separated
+    settingsFile << 'sonar.modules='
+    bndProjects.eachWithIndex { item,idx ->
+        if(idx > 0) {
+            settingsFile << ', '
+        }
+
+        settingsFile << "$item"
+    }
+    settingsFile << '\n'
+
+    // Add all resulting jar files comma separated
+    settingsFile << 'sonar.libraries='
+    bndProjects.eachWithIndex { item,idx ->
+        if(idx > 0) {
+            settingsFile << ', '
+        }
+
+        // Check for output directory
+        if (new File(item, 'generated').exists()) {
+            settingsFile << "$item" << '/generated/' << "$item" << '.jar'
+        }
+    }
+
+    settingsFile << '\n'
+}
